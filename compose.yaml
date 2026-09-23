@@ -1,6 +1,6 @@
 services:
   nas-video-server:
-    image: ghcr.io/ccawmiku/nas-video-server:v1.0.11
+    image: ghcr.io/ccawmiku/nas-video-server:v1.0.12
     container_name: nas-video-server
     restart: unless-stopped
     ports:
