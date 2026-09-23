@@ -37,10 +37,6 @@ func probe(bin, path string) MediaMeta {
 	return MediaMeta{Title: v.Format.Tags["title"], Duration: num(v.Format.Duration), JSON: string(c)}
 }
 
-// creationTime is intentionally conservative: NAS filesystems vary in whether
-// birth time is exposed to containers. A missing value is shown as unavailable.
-func creationTime(path string) (int64, bool) { return 0, false }
-
 type Job struct {
 	ID       string
 	Video    int64
@@ -312,7 +308,8 @@ func (s *Server) transcode(ctx context.Context, j *Job, path string, v struct {
 	dir := filepath.Join(s.cfg.Cache, "streams", j.ID)
 	_ = os.MkdirAll(dir, 0750)
 	out := filepath.Join(dir, "index.m3u8")
-	args := []string{"-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
+	cpuArgs := []string{"-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
+	args := cpuArgs
 	if _, e := os.Stat(s.cfg.Device); e == nil {
 		j.mu.Lock()
 		j.Mode = "vaapi"
@@ -328,8 +325,7 @@ func (s *Server) transcode(ctx context.Context, j *Job, path string, v struct {
 		j.mu.Unlock()
 		_ = os.RemoveAll(dir)
 		_ = os.MkdirAll(dir, 0750)
-		args[0] = "-hide_banner"
-		cmd = exec.CommandContext(ctx, s.cfg.FFmpeg, args...)
+		cmd = exec.CommandContext(ctx, s.cfg.FFmpeg, cpuArgs...)
 		err = cmd.Run()
 	}
 	j.mu.Lock()
