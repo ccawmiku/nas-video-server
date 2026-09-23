@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -233,28 +234,51 @@ func (s *Server) subtitle(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "视频不存在")
 		return
 	}
-	data, e := os.ReadFile(path)
+	base := strings.TrimSuffix(path, filepath.Ext(path))
+	for _, ext := range []string{".vtt", ".srt", ".ass"} {
+		candidate := base + ext
+		if data, e := os.ReadFile(candidate); e == nil {
+			if ext == ".vtt" {
+				w.Header().Set("Content-Type", "text/vtt")
+				_, _ = w.Write(data)
+				return
+			}
+			w.Header().Set("Content-Type", "text/vtt")
+			converted := regexp.MustCompile(`(\d{2}:\d{2}:\d{2}),(\d{3})`).ReplaceAllString(string(data), `$1.$2`)
+			_, _ = w.Write([]byte("WEBVTT\n\n" + converted))
+			return
+		}
+	}
+	stream := r.URL.Query().Get("stream")
+	if stream == "" {
+		stream = "0"
+	}
+	data, e := exec.Command(s.cfg.FFmpeg, "-v", "error", "-i", path, "-map", "0:s:"+stream, "-c:s", "webvtt", "-f", "webvtt", "pipe:1").Output()
 	if e != nil {
-		fail(w, 500, bad(e))
+		fail(w, 404, "没有可用字幕")
 		return
 	}
-	_ = data
-	fail(w, 501, "字幕轨道将在播放会话中输出")
+	w.Header().Set("Content-Type", "text/vtt")
+	_, _ = w.Write(data)
 }
 func (s *Server) randomVideo(w http.ResponseWriter, r *http.Request) {
 	lib, _ := strconv.ParseInt(r.URL.Query().Get("library"), 10, 64)
-	var id int64
+	var id, library int64
+	var title, path string
+	var size, mtime, created int64
+	var duration, position float64
+	var favorite int
 	var e error
 	if lib > 0 {
-		e = s.db.QueryRow("SELECT id FROM videos WHERE library_id=? AND missing=0 ORDER BY random() LIMIT 1", lib).Scan(&id)
+		e = s.db.QueryRow("SELECT id,library_id,title,path,size,mtime,created,duration,position,favorite FROM videos WHERE library_id=? AND missing=0 ORDER BY random() LIMIT 1", lib).Scan(&id, &library, &title, &path, &size, &mtime, &created, &duration, &position, &favorite)
 	} else {
-		e = s.db.QueryRow("SELECT id FROM videos WHERE missing=0 ORDER BY random() LIMIT 1").Scan(&id)
+		e = s.db.QueryRow("SELECT id,library_id,title,path,size,mtime,created,duration,position,favorite FROM videos WHERE missing=0 ORDER BY random() LIMIT 1").Scan(&id, &library, &title, &path, &size, &mtime, &created, &duration, &position, &favorite)
 	}
 	if e != nil {
 		fail(w, 404, "没有可播放视频")
 		return
 	}
-	jsonOut(w, map[string]int64{"id": id})
+	jsonOut(w, map[string]any{"id": id, "video": map[string]any{"id": id, "libraryId": library, "title": title, "path": path, "size": size, "mtime": mtime, "created": created, "duration": duration, "position": position, "favorite": favorite == 1}})
 }
 func (s *Server) play(w http.ResponseWriter, r *http.Request) {
 	var v struct {
