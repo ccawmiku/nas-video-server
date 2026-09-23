@@ -332,13 +332,14 @@ func (s *Server) transcode(ctx context.Context, j *Job, path string, v struct {
 	dir := filepath.Join(s.cfg.Cache, "streams", j.ID)
 	_ = os.MkdirAll(dir, 0750)
 	out := filepath.Join(dir, "index.m3u8")
-	cpuArgs := []string{"-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
+	audio := strconv.Itoa(v.Audio)
+	cpuArgs := []string{"-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:v:0", "-map", "0:a:" + audio + "?", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
 	args := cpuArgs
 	if _, e := os.Stat(s.cfg.Device); e == nil {
 		j.mu.Lock()
 		j.Mode = "vaapi"
 		j.mu.Unlock()
-		args = []string{"-hide_banner", "-loglevel", "error", "-vaapi_device", s.cfg.Device, "-i", path, "-map", "0:v:0", "-map", "0:a:0?", "-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi", "-b:v", "4M", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
+		args = []string{"-hide_banner", "-loglevel", "error", "-vaapi_device", s.cfg.Device, "-i", path, "-map", "0:v:0", "-map", "0:a:" + audio + "?", "-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi", "-b:v", "4M", "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "4", "-hls_list_size", "8", "-hls_flags", "delete_segments+append_list", out}
 	}
 	cmd := exec.CommandContext(ctx, s.cfg.FFmpeg, args...)
 	err := cmd.Run()
