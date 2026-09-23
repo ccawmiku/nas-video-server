@@ -1,0 +1,14 @@
+.tools/
+.local/
+.env
+*.db
+*.db-*
+*.exe
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+internal/server/static/*
+!internal/server/static/.gitkeep
+coverage*
+*.log

@@ -1,0 +1,29 @@
+services:
+  nas-video-server:
+    image: ghcr.io/ccawmiku/nas-video-server:v1.0.0
+    container_name: nas-video-server
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    environment:
+      TZ: Asia/Shanghai
+      DATA_DIR: /data
+      CACHE_DIR: /cache
+      LISTEN_ADDR: :8096
+      MAX_TRANSCODES: "2"
+      CPU_THREADS: "2"
+      STABLE_SECONDS: "60"
+      VAAPI_DEVICE: /dev/dri/renderD128
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ./data:/data
+      - ./cache:/cache
+      - /volume1/media:/media
+    mem_limit: 768m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
